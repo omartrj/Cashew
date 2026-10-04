@@ -22,6 +22,7 @@ import 'package:budget/widgets/openPopup.dart';
 import 'package:budget/widgets/framework/pageFramework.dart';
 import 'package:budget/widgets/openSnackbar.dart';
 import 'package:budget/widgets/selectChips.dart';
+import 'package:budget/pages/editTagsPage.dart';
 import 'package:budget/widgets/framework/popupFramework.dart';
 import 'package:budget/widgets/radioItems.dart';
 import 'package:budget/widgets/saveBottomButton.dart';
@@ -108,6 +109,8 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
   bool? canAddBudget;
   List<String>? selectedCategoryPks;
   List<String>? selectedCategoryPksExclude;
+  // null or empty means the budget does not filter by tag
+  List<String>? selectedTagPks;
   double? selectedAmount;
   String? selectedAmountCalculation;
   String? selectedTitle;
@@ -340,6 +343,12 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
           currentInstance?.isAbsoluteSpendingLimit ?? false,
       income: selectedIncome,
       walletFks: selectedWalletFks,
+      tagFks: widget.budget?.addedTransactionsOnly == true ||
+              selectedAddedTransactionsOnly ||
+              currentInstance?.sharedKey != null ||
+              (selectedTagPks ?? []).isEmpty
+          ? null
+          : selectedTagPks,
     );
   }
 
@@ -433,6 +442,7 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
 
       selectedCategoryPks = widget.budget!.categoryFks;
       selectedCategoryPksExclude = widget.budget!.categoryFksExclude;
+      selectedTagPks = widget.budget!.tagFks;
       //Set to false because we can't save until we made some changes
       setState(() {
         canAddBudget = false;
@@ -1259,6 +1269,58 @@ class _AddBudgetPageState extends State<AddBudgetPage> {
                       fadeOutWhenSelected: true,
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
+          SliverStickyLabelDivider(
+            info: "filter-by-tags".tr(),
+            extraInfo: (selectedTagPks ?? []).isEmpty
+                ? "no-tag-filter".tr()
+                : Provider.of<AllTags>(context)
+                    .tagsOf(selectedTagPks)
+                    .map((tag) => tag.name)
+                    .join(", "),
+            visible: Provider.of<AllTags>(context).list.isNotEmpty &&
+                !(selectedShared == true || selectedAddedTransactionsOnly) &&
+                ((widget.budget != null &&
+                        widget.budget!.sharedKey == null &&
+                        widget.budget!.addedTransactionsOnly == false) ||
+                    widget.budget == null),
+            sliver: SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(bottom: 5, top: 5),
+                child: SelectChips(
+                  items: Provider.of<AllTags>(context).list,
+                  getLabel: (Tag tag) => tag.name,
+                  getAvatar: (Tag tag) => TagColorDot(tag: tag),
+                  onSelected: (Tag tag) {
+                    List<String> tagPks = [...(selectedTagPks ?? [])];
+                    if (tagPks.contains(tag.tagPk)) {
+                      tagPks.remove(tag.tagPk);
+                    } else {
+                      tagPks.add(tag.tagPk);
+                    }
+                    setState(() {
+                      selectedTagPks = tagPks;
+                    });
+                    determineBottomButton();
+                  },
+                  getSelected: (Tag tag) =>
+                      (selectedTagPks ?? []).contains(tag.tagPk),
+                  getCustomBorderColor: (Tag tag) {
+                    return dynamicPastel(
+                      context,
+                      lightenPastel(
+                        HexColor(
+                          tag.colour,
+                          defaultColor: Theme.of(context).colorScheme.primary,
+                        ),
+                        amount: 0.3,
+                      ),
+                      amount: 0.4,
+                    );
+                  },
                 ),
               ),
             ),

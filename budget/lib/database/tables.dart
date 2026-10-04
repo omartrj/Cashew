@@ -26,7 +26,7 @@ import 'package:budget/pages/activityPage.dart';
 import 'package:flutter/material.dart' show RangeValues;
 part 'tables.g.dart';
 
-int schemaVersionGlobal = 47;
+int schemaVersionGlobal = 48;
 
 // To update and migrate the database, check the README
 
@@ -474,6 +474,9 @@ class Budgets extends Table {
       text().map(const StringListInColumnConverter()).nullable()();
   BoolColumn get isAbsoluteSpendingLimit =>
       boolean().withDefault(const Constant(false))();
+  // Only count transactions with at least one of these tags, null for any
+  TextColumn get tagFks =>
+      text().map(const StringListInColumnConverter()).nullable()();
 
   @override
   Set<Column> get primaryKey => {budgetPk};
@@ -1226,6 +1229,14 @@ class FinanceDatabase extends _$FinanceDatabase {
                 print(
                     "Migration Error: Error creating column transactions.tagFks " +
                         e.toString());
+              }
+            },
+            from47To48: (m, schema) async {
+              try {
+                await m.addColumn(schema.budgets, schema.budgets.tagFks);
+              } catch (e) {
+                print("Migration Error: Error creating column budgets.tagFks " +
+                    e.toString());
               }
             },
           ),
@@ -2441,13 +2452,20 @@ class FinanceDatabase extends _$FinanceDatabase {
     return indexedByPk;
   }
 
+  // Kept up to date by watchAllTagsIndexed, which WatchAllTags listens to
+  // for the whole life of the app
+  List<Tag> tagsCache = [];
+
   Stream<AllTags> watchAllTagsIndexed() {
     return (select(tags)..orderBy([(t) => OrderingTerm.asc(t.order)]))
         .watch()
-        .map((tags) => AllTags(
-              list: tags,
-              indexedByPk: {for (Tag tag in tags) tag.tagPk: tag},
-            ));
+        .map((tags) {
+      tagsCache = tags;
+      return AllTags(
+        list: tags,
+        indexedByPk: {for (Tag tag in tags) tag.tagPk: tag},
+      );
+    });
   }
 
   Stream<AllWallets> watchAllWalletsIndexed() {
@@ -6236,7 +6254,23 @@ class FinanceDatabase extends _$FinanceDatabase {
             tbl.name.collate(Collate.noCase).like("%" + searchQuery + "%") |
             tbl.note.collate(Collate.noCase).like("%" + searchQuery + "%") |
             onlyShowIfSearchQueryDateIsDate(searchQuery, tbl) |
-            onlyShowIfSearchQueryAmount(searchQuery, tbl.amount);
+            onlyShowIfSearchQueryAmount(searchQuery, tbl.amount) |
+            onlyShowIfSearchQueryMatchesTag(searchQuery, tbl);
+  }
+
+  // Transactions with a tag whose name contains the search query
+  // Uses tagsCache, since the tag names are not in the transactions table
+  Expression<bool> onlyShowIfSearchQueryMatchesTag(
+      String searchQuery, $TransactionsTable tbl) {
+    List<String> matchingTagPks = tagsCache
+        .where((tag) => tag.name
+            .toLowerCase()
+            .contains(searchQuery.toLowerCase().trim()))
+        .map((tag) => tag.tagPk)
+        .toList();
+    if (matchingTagPks.isEmpty || searchQuery.trim() == "")
+      return Constant(false);
+    return onlyShowBasedOnTagFks(tbl, matchingTagPks);
   }
 
   Expression<bool> onlyShowIfSearchQueryAmount(
@@ -6344,13 +6378,19 @@ class FinanceDatabase extends _$FinanceDatabase {
             (tbl.categoryFk.equals("0").not())
         : Constant(true);
 
+    // Budgets can be limited to transactions with some tags
+    Expression<bool> includeTags = budget?.addedTransactionsOnly == true
+        ? Constant(true)
+        : onlyShowBasedOnTagFks(tbl, budget?.tagFks);
+
     return memberIncluded &
         includeShared &
         includeAdded &
         includeIncome &
         includeDebtAndCredit &
         includeAddedToObjective &
-        includeBalanceCorrection;
+        includeBalanceCorrection &
+        includeTags;
   }
 
   Stream<double?> watchTotalSpentByCurrentUserOnly(

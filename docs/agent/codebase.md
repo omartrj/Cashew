@@ -18,7 +18,7 @@ Cashew/
 │   │   ├── widgets/             ← widget riutilizzabili (87) + framework/, transactionEntry/, util/
 │   │   └── modified/            ← reorderable_list modificata
 │   ├── packages/                ← pacchetti abbandonati, copiati e modificati (sliding_sheet, implicitly_animated_reorderable_list)
-│   ├── drift_schemas/           ← export JSON degli schemi DB (v33 → v47)
+│   ├── drift_schemas/           ← export JSON degli schemi DB (v33 → v48)
 │   ├── assets/                  ← font, icone categorie, traduzioni, valute
 │   ├── android/ ios/ web/       ← piattaforme (niente desktop)
 │   └── test/                    ← vuoto (template)
@@ -64,14 +64,14 @@ Variabili top-level, inizializzate in `main()`:
 
 ### Migrazione dello schema (obbligatoria per ogni modifica a tabelle o colonne)
 
-Versione attuale: `schemaVersionGlobal = 47` (`tables.dart`, riga ~29). Da `budget/`:
+Versione attuale: `schemaVersionGlobal = 48` (`tables.dart`, riga ~29). Da `budget/`:
 
 1. Modifica tabelle e colonne in `tables.dart`; preferisci colonne `nullable()` o con default, per non rompere i dati esistenti.
-2. Porta `schemaVersionGlobal` a 48.
+2. Porta `schemaVersionGlobal` a 49.
 3. `fvm dart run build_runner build --delete-conflicting-outputs` (`budget/build.yaml` disattiva i "manager" di drift 2.18, così `tables.g.dart` resta simile a quello upstream)
-4. `fvm dart run drift_dev schema dump lib/database/tables.dart drift_schemas/drift_schema_v48.json`
+4. `fvm dart run drift_dev schema dump lib/database/tables.dart drift_schemas/drift_schema_v49.json`
 5. `fvm dart run drift_dev schema steps drift_schemas/ lib/database/schema_versions.dart`
-6. In `MigrationStrategy.onUpgrade` (~riga 714) aggiungi il passo `from47To48: (m, schema) async { ... }` dentro `stepByStep(migrationSteps(...))` (~riga 869), seguendo il modello di `from46To47`.
+6. In `MigrationStrategy.onUpgrade` (~riga 714) aggiungi il passo `from48To49: (m, schema) async { ... }` dentro `stepByStep(migrationSteps(...))` (~riga 869), seguendo il modello di `from47To48`.
 7. Attenzione a import ed export: `widgets/importDB.dart`, `exportDB.dart`, `importCSV.dart` ed `exportCSV.dart` possono dover gestire la nuova colonna, così come la sync (`struct/syncClient.dart`).
 
 ## Navigazione e UI
@@ -102,7 +102,7 @@ Versione attuale: `schemaVersionGlobal = 47` (`tables.dart`, riga ~29). Da `budg
 
 ## Tag (feature del fork)
 
-Tag globali (nome + colore) assegnabili a più transazioni, aggiunti dal fork nello schema v47.
+Tag globali (nome + colore) assegnabili a più transazioni, aggiunti dal fork negli schemi v47 (tag e transazioni) e v48 (filtro tag dei budget).
 
 - **Dati**: tabella `Tags` (`tagPk`, `name`, `colour`, `order`) e colonna `Transactions.tagFks`, lista JSON di `tagPk` (null se nessun tag), come `budgetFksExclude`. Niente tabella ponte: i tag viaggiano dentro la transazione, quindi la sync per riga funziona da sola; la tabella `Tags` è sincronizzata con `UpdateLogType.Tag` / `DeleteLogType.Tag`.
 - **Query** (`tables.dart`): `createOrUpdateTag`, `watchAllTags`, `watchAllTagsIndexed`, `moveTag`, `deleteTag` (toglie il tag dalle transazioni prima di eliminarlo), `getTagInstanceGivenNameTrim`, `onlyShowBasedOnTagFks` (almeno uno dei tag).
@@ -110,7 +110,8 @@ Tag globali (nome + colore) assegnabili a più transazioni, aggiunti dal fork ne
 - **UI**: gestione in `pages/editTagsPage.dart` (Impostazioni → Strumenti ed extra → Tag) e `pages/addTagPage.dart` (bottom sheet, restituisce il `Tag` salvato); selettore `widgets/selectTags.dart` nella pagina transazione e nel popup categoria; etichette in `transactionEntryTag.dart`; filtro `SearchFilters.tagPks` (chiave `tagPks` nella filter string).
 - **CSV**: l'export ha la colonna `tags` (nomi separati da `; `), l'import la legge (anche `tag`/`labels`) e crea i tag mancanti.
 - **Statistiche**: sezione "Tag" sotto le categorie della pagina All Spending / dettaglio account (`widgets/tagSpendingSummary.dart`, dentro `WalletCategoryPieChart`), con la query `watchTotalSpentInEachTag` (stessi filtri di periodo, uscite/entrate e conversione valuta del grafico categorie). Una transazione con più tag conta in ognuno; toccando un tag si apre la ricerca filtrata.
-- **Non ancora fatto**: budget per tag, ricerca testuale sui nomi dei tag.
+- **Budget per tag**: colonna `Budgets.tagFks` (null = nessun filtro), applicata in `onlyShowIfFollowsFilters` (che ogni query del budget riceve con `budget:`), tranne per i budget "solo aggiunte". Si imposta in `addBudgetPage.dart` ("Filtra per tag", sotto le categorie); nascosta per budget condivisi o solo aggiunte, come le categorie.
+- **Ricerca testuale**: `onlyShowIfSearchQueryMatchesTag` trova le transazioni con un tag il cui nome contiene il testo; usa `FinanceDatabase.tagsCache`, aggiornata da `watchAllTagsIndexed` (sempre ascoltato da `WatchAllTags`).
 
 ## Sync, backup e Firebase
 
