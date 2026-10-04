@@ -100,6 +100,17 @@ Versione attuale: `schemaVersionGlobal = 47` (`tables.dart`, riga ~29). Da `budg
   - rigenera i JSON con una versione dello script senza download e con `os.path.join`, oppure, per poche chiavi, aggiungile direttamente in `generated/en.json` e `generated/it.json` tenendole allineate al CSV;
   - le chiavi senza traduzione ricadono su `en` (`useFallbackTranslations` in `struct/languageMap.dart`).
 
+## Tag (feature del fork)
+
+Tag globali (nome + colore) assegnabili a più transazioni, aggiunti dal fork nello schema v47.
+
+- **Dati**: tabella `Tags` (`tagPk`, `name`, `colour`, `order`) e colonna `Transactions.tagFks`, lista JSON di `tagPk` (null se nessun tag), come `budgetFksExclude`. Niente tabella ponte: i tag viaggiano dentro la transazione, quindi la sync per riga funziona da sola; la tabella `Tags` è sincronizzata con `UpdateLogType.Tag` / `DeleteLogType.Tag`.
+- **Query** (`tables.dart`): `createOrUpdateTag`, `watchAllTags`, `watchAllTagsIndexed`, `moveTag`, `deleteTag` (toglie il tag dalle transazioni prima di eliminarlo), `getTagInstanceGivenNameTrim`, `onlyShowBasedOnTagFks` (almeno uno dei tag).
+- **Stato globale**: `Provider.of<AllTags>(context)` (`WatchAllTags` in `widgets/watchAllWallets.dart`, montato in `main.dart`); `tagsOf(tagFks)` restituisce i `Tag` di una transazione nell'ordine dell'utente.
+- **UI**: gestione in `pages/editTagsPage.dart` (Impostazioni → Strumenti ed extra → Tag) e `pages/addTagPage.dart` (bottom sheet, restituisce il `Tag` salvato); selettore `widgets/selectTags.dart` nella pagina transazione e nel popup categoria; etichette in `transactionEntryTag.dart`; filtro `SearchFilters.tagPks` (chiave `tagPks` nella filter string).
+- **CSV**: l'export ha la colonna `tags` (nomi separati da `; `), l'import la legge (anche `tag`/`labels`) e crea i tag mancanti.
+- **Fase 2, non ancora fatta**: statistiche per tag, budget per tag, ricerca testuale sui nomi dei tag.
+
 ## Sync, backup e Firebase
 
 - Sync tra dispositivi e backup passano da **Google Drive** (`struct/syncClient.dart`, `widgets/accountAndBackup.dart`): il DB intero viene caricato su Drive e unito con gli altri client tramite `dateTimeModified` e `DeleteLogs`.

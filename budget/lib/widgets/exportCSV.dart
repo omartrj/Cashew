@@ -102,6 +102,7 @@ class ExportCSV extends StatelessWidget {
         ));
         return;
       }
+      List<Tag> allTags = await database.getAllTags();
       for (TransactionWithCategory transactionWithCategory in transactions) {
         Map<
             String,
@@ -137,6 +138,14 @@ class ExportCSV extends StatelessWidget {
               transactionWithCategory.budget?.name ?? "",
           "objective": (transactionWithCategory) =>
               transactionWithCategory.objective?.name ?? "",
+          // Tag names separated by "; " (the separator the CSV import uses)
+          "tags": (transactionWithCategory) => allTags
+              .where((tag) =>
+                  transactionWithCategory.transaction.tagFks
+                      ?.contains(tag.tagPk) ==
+                  true)
+              .map((tag) => tag.name)
+              .join("; "),
         };
         Map<String, String> outMap =
             createRowOutput(transactionWithCategory, lookups);

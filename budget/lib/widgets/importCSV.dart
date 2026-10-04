@@ -174,6 +174,13 @@ class _ImportCSVState extends State<ImportCSV> {
           "setHeaderValue": "",
           "setHeaderIndex": -1,
         },
+        "tags": {
+          "displayName": "tags",
+          "headerValues": ["tags", "tag", "labels"],
+          "required": false,
+          "setHeaderValue": "",
+          "setHeaderIndex": -1,
+        },
         "wallet": {
           "displayName": "account",
           "headerValues": ["wallet", "account", "accountName", "account name"],
@@ -1070,6 +1077,29 @@ class _ImportingEntriesPopupState extends State<ImportingEntriesPopup> {
 
     bool income = amount > 0;
 
+    // Tag names separated by ";", missing tags are created
+    List<String> tagFks = [];
+    if (assignedColumns["tags"]!["setHeaderIndex"] != -1) {
+      for (String tagName in row[assignedColumns["tags"]!["setHeaderIndex"]]
+          .toString()
+          .split(";")) {
+        tagName = tagName.trim();
+        if (tagName == "") continue;
+        Tag? tag = await database.getTagInstanceGivenNameTrim(tagName);
+        if (tag == null) {
+          tag = Tag(
+            tagPk: uuid.v4(),
+            name: tagName,
+            dateCreated: DateTime.now(),
+            dateTimeModified: null,
+            order: await database.getAmountOfTags(),
+          );
+          await database.createOrUpdateTag(tag);
+        }
+        if (tagFks.contains(tag.tagPk) == false) tagFks.add(tag.tagPk);
+      }
+    }
+
     // if mainCategoryPk == null -> subcategory
     String mainCategoryFk =
         selectedCategory.mainCategoryPk ?? selectedCategory.categoryPk;
@@ -1092,6 +1122,7 @@ class _ImportingEntriesPopupState extends State<ImportingEntriesPopup> {
         paid: true,
         skipPaid: false,
         methodAdded: MethodAdded.csv,
+        tagFks: tagFks.isEmpty ? null : tagFks,
       ),
       name == ""
           ? null
