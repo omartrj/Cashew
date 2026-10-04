@@ -67,6 +67,7 @@ import 'package:budget/struct/linkHighlighter.dart';
 import 'package:budget/widgets/listItem.dart';
 import 'package:budget/widgets/outlinedButtonStacked.dart';
 import 'package:budget/widgets/tappableTextEntry.dart';
+import 'package:budget/widgets/selectTags.dart';
 
 //TODO
 //only show the tags that correspond to selected category
@@ -157,6 +158,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   bool notesInputFocused = false;
   bool showMoreOptions = false;
   List<String> selectedExcludedBudgetPks = [];
+  List<String> selectedTagPks = [];
   late bool isAddedToLoanObjective =
       widget.selectedObjective?.type == ObjectiveType.loan ||
           widget.transaction?.objectiveLoanFk != null;
@@ -315,6 +317,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
   void setSelectedExcludedBudgetPks(List<String>? budgetPks) {
     setState(() {
       selectedExcludedBudgetPks = budgetPks ?? [];
+    });
+    return;
+  }
+
+  void setSelectedTagPks(List<String> tagPks) {
+    setState(() {
+      selectedTagPks = tagPks;
     });
     return;
   }
@@ -701,6 +710,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       objectiveLoanFk: selectedObjectiveLoanPk,
       budgetFksExclude:
           selectedExcludedBudgetPks.isEmpty ? null : selectedExcludedBudgetPks,
+      tagFks: selectedTagPks.isEmpty ? null : selectedTagPks,
     );
 
     return createdTransaction;
@@ -755,6 +765,7 @@ class _AddTransactionPageState extends State<AddTransactionPage>
       selectedObjectivePk = widget.transaction!.objectiveFk;
       selectedObjectiveLoanPk = widget.transaction!.objectiveLoanFk;
       selectedExcludedBudgetPks = widget.transaction!.budgetFksExclude ?? [];
+      selectedTagPks = [...(widget.transaction!.tagFks ?? [])];
       // var amountString = widget.transaction!.amount.toStringAsFixed(2);
       // if (amountString.substring(amountString.length - 2) == "00") {
       //   selectedAmountCalculation =
@@ -929,6 +940,13 @@ class _AddTransactionPageState extends State<AddTransactionPage>
             extraHorizontalPadding: 13,
             wrapped: false,
             objectiveType: ObjectiveType.goal,
+          ),
+          SelectTags(
+            setSelectedTags: setSelectedTagPks,
+            selectedTagPks: selectedTagPks,
+            extraHorizontalPadding: 13,
+            wrapped: false,
+            hideIfNoTags: true,
           ),
         ],
       ),
@@ -1496,6 +1514,11 @@ class _AddTransactionPageState extends State<AddTransactionPage>
                 setSelectedIncome: setSelectedIncome,
                 horizontalBreak: true,
                 objectiveType: ObjectiveType.loan,
+              ),
+              SelectTags(
+                setSelectedTags: setSelectedTagPks,
+                selectedTagPks: selectedTagPks,
+                horizontalBreak: true,
               ),
               AnimatedExpanded(
                 expand:

@@ -24,6 +24,7 @@ import 'package:budget/widgets/exportCSV.dart';
 import 'package:budget/pages/autoTransactionsPageEmail.dart';
 import 'package:budget/pages/activityPage.dart';
 import 'package:budget/pages/editAssociatedTitlesPage.dart';
+import 'package:budget/pages/editTagsPage.dart';
 import 'package:budget/pages/editBudgetPage.dart';
 import 'package:budget/pages/editCategoriesPage.dart';
 import 'package:budget/pages/editWalletsPage.dart';
@@ -563,6 +564,14 @@ class SettingsPageContent extends StatelessWidget {
         ),
 
         SettingsHeader(title: "tools-and-extras".tr()),
+
+        SettingsContainerOpenPage(
+          openPage: EditTagsPage(),
+          title: "tags".tr(),
+          icon: appStateSettings["outlinedIcons"]
+              ? Icons.sell_outlined
+              : Icons.sell_rounded,
+        ),
         // SettingsContainerOpenPage(
         //   openPage: AutoTransactionsPage(),
         //   title: "Auto Transactions",

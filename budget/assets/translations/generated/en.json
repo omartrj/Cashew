@@ -1180,5 +1180,14 @@
   "import-warning": "Import Warning",
   "import-warning-description": "Import may fail! Please make sure you have selected a valid Cashew [.sqlite] or [.sql] backup file",
   "duplicate-budget-question": "Duplicate Budget?",
-  "duplicate-budget": "Duplicate Budget"
+  "duplicate-budget": "Duplicate Budget",
+  "tags": "Tags",
+  "add-tag": "Add Tag",
+  "edit-tag": "Edit Tag",
+  "tag-already-exists": "A tag with this name already exists",
+  "search-tags-placeholder": "Search tags...",
+  "no-tags-found": "No tags found.",
+  "delete-tag-question": "Delete Tag?",
+  "delete-tag-description": "It will be removed from {count} transactions. The transactions will not be deleted.",
+  "deleted-tag": "Deleted Tag"
 }
