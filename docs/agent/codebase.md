@@ -109,7 +109,8 @@ Tag globali (nome + colore) assegnabili a più transazioni, aggiunti dal fork ne
 - **Stato globale**: `Provider.of<AllTags>(context)` (`WatchAllTags` in `widgets/watchAllWallets.dart`, montato in `main.dart`); `tagsOf(tagFks)` restituisce i `Tag` di una transazione nell'ordine dell'utente.
 - **UI**: gestione in `pages/editTagsPage.dart` (Impostazioni → Strumenti ed extra → Tag) e `pages/addTagPage.dart` (bottom sheet, restituisce il `Tag` salvato); selettore `widgets/selectTags.dart` nella pagina transazione e nel popup categoria; etichette in `transactionEntryTag.dart`; filtro `SearchFilters.tagPks` (chiave `tagPks` nella filter string).
 - **CSV**: l'export ha la colonna `tags` (nomi separati da `; `), l'import la legge (anche `tag`/`labels`) e crea i tag mancanti.
-- **Fase 2, non ancora fatta**: statistiche per tag, budget per tag, ricerca testuale sui nomi dei tag.
+- **Statistiche**: sezione "Tag" sotto le categorie della pagina All Spending / dettaglio account (`widgets/tagSpendingSummary.dart`, dentro `WalletCategoryPieChart`), con la query `watchTotalSpentInEachTag` (stessi filtri di periodo, uscite/entrate e conversione valuta del grafico categorie). Una transazione con più tag conta in ognuno; toccando un tag si apre la ricerca filtrata.
+- **Non ancora fatto**: budget per tag, ricerca testuale sui nomi dei tag.
 
 ## Sync, backup e Firebase
 

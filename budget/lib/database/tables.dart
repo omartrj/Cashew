@@ -663,6 +663,20 @@ class SelectedWalletPk with ChangeNotifier {
   SelectedWalletPk({required this.selectedWalletPk});
 }
 
+class TagWithTotal {
+  final String tagPk;
+  final Tag? tag;
+  final double total;
+  final int transactionCount;
+
+  TagWithTotal({
+    required this.tagPk,
+    this.tag,
+    required this.total,
+    required this.transactionCount,
+  });
+}
+
 class CategoryWithTotal {
   final TransactionCategory category;
   final CategoryBudgetLimit? categoryBudgetLimit;
@@ -6783,6 +6797,91 @@ class FinanceDatabase extends _$FinanceDatabase {
   // The total amount of that category will always be that last column
   // print(snapshot.data![0].rawData.data["transactions.category_fk"]);
   // print(snapshot.data![0].rawData.data["c" + (snapshot.data![0].rawData.data.length).toString()]);
+  // Total and number of transactions of each tag, in the primary currency
+  // A transaction with many tags is counted in each of them
+  // Follows the same filters as watchTotalSpentInEachCategoryInTimeRangeFromCategories
+  // when used by the all spending page
+  Stream<List<TagWithTotal>> watchTotalSpentInEachTag({
+    required AllWallets allWallets,
+    required List<Tag> allTags,
+    List<String>? walletPks,
+    bool? isIncome,
+    bool followCustomPeriodCycle = false,
+    String cycleSettingsExtension = "",
+    DateTimeRange? forcedDateTimeRange,
+    SearchFilters? searchFilters,
+    bool paidOnly = true,
+  }) {
+    List<Stream<Map<String, TagWithTotal>>> mergedStreams = [];
+    for (TransactionWallet wallet in allWallets.list) {
+      if (walletPks != null && walletPks.contains(wallet.walletPk) == false)
+        continue;
+      double ratio = amountRatioToPrimaryCurrency(allWallets, wallet.currency);
+      final query = select(transactions)
+        ..where((tbl) {
+          return onlyShowIfFollowsSearchFilters(
+                tbl,
+                searchFilters,
+                joinedWithSubcategoriesTable: null,
+                joinedWithCategories: false,
+                joinedWithBudgets: false,
+                joinedWithObjectives: false,
+                joinedWithObjectiveLoans: null,
+              ) &
+              onlyShowIfNotBalanceCorrection(tbl, isIncome) &
+              onlyShowIfFollowCustomPeriodCycle(
+                tbl,
+                followCustomPeriodCycle,
+                cycleSettingsExtension: cycleSettingsExtension,
+                forcedDateTimeRange: forcedDateTimeRange,
+              ) &
+              tbl.walletFk.equals(wallet.walletPk) &
+              onlyShowBasedOnIncome(tbl, isIncome) &
+              tbl.tagFks.isNotNull();
+        });
+      mergedStreams.add(query.watch().map((List<Transaction> transactions) {
+        Map<String, TagWithTotal> totals = {};
+        for (Transaction transaction in transactions) {
+          for (String tagPk in transaction.tagFks ?? []) {
+            TagWithTotal current = totals[tagPk] ??
+                TagWithTotal(tagPk: tagPk, total: 0, transactionCount: 0);
+            totals[tagPk] = TagWithTotal(
+              tagPk: tagPk,
+              total: current.total +
+                  (paidOnly == false || transaction.paid
+                      ? transaction.amount * ratio
+                      : 0),
+              transactionCount: current.transactionCount + 1,
+            );
+          }
+        }
+        return totals;
+      }));
+    }
+    if (mergedStreams.isEmpty) return Stream.value([]);
+
+    return StreamZip(mergedStreams).map((totalsOfEachWallet) {
+      List<TagWithTotal> out = [];
+      for (Tag tag in allTags) {
+        double total = 0;
+        int transactionCount = 0;
+        for (Map<String, TagWithTotal> totals in totalsOfEachWallet) {
+          total += totals[tag.tagPk]?.total ?? 0;
+          transactionCount += totals[tag.tagPk]?.transactionCount ?? 0;
+        }
+        if (transactionCount <= 0) continue;
+        out.add(TagWithTotal(
+          tagPk: tag.tagPk,
+          tag: tag,
+          total: total,
+          transactionCount: transactionCount,
+        ));
+      }
+      out.sort((a, b) => b.total.abs().compareTo(a.total.abs()));
+      return out;
+    });
+  }
+
   Stream<List<CategoryWithTotal>>
       watchTotalSpentInEachCategoryInTimeRangeFromCategories({
     required AllWallets allWallets,

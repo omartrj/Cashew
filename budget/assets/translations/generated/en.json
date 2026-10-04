@@ -1189,5 +1189,6 @@
   "no-tags-found": "No tags found.",
   "delete-tag-question": "Delete Tag?",
   "delete-tag-description": "It will be removed from {count} transactions. The transactions will not be deleted.",
-  "deleted-tag": "Deleted Tag"
+  "deleted-tag": "Deleted Tag",
+  "tags-spending-description": "A transaction with more than one tag is counted in each of them."
 }

@@ -14,6 +14,7 @@ import 'package:budget/pages/upcomingOverdueTransactionsPage.dart';
 import 'package:budget/struct/databaseGlobal.dart';
 import 'package:budget/struct/settings.dart';
 import 'package:budget/struct/spendingSummaryHelper.dart';
+import 'package:budget/widgets/tagSpendingSummary.dart';
 import 'package:budget/widgets/animatedExpanded.dart';
 import 'package:budget/widgets/budgetHistoryLineGraph.dart';
 import 'package:budget/widgets/button.dart';
@@ -1810,6 +1811,8 @@ class _WalletDetailsCategorySelectionState
           searchFilters: widget.searchFilters,
           isAllSpending: widget.wallet == null,
           walletPks: widget.walletPks,
+          getDateTimeRangeForPassedSearchFilters:
+              widget.getDateTimeRangeForPassedSearchFilters,
           onSelectedCategory: (TransactionCategory? category) {
             // pageState.currentState?.scrollTo(500);
             setState(() {
@@ -1905,6 +1908,7 @@ class WalletCategoryPieChart extends StatefulWidget {
     required this.isAllSpending,
     this.searchFilters,
     this.selectedDateTimeRange,
+    this.getDateTimeRangeForPassedSearchFilters,
     super.key,
   });
 
@@ -1915,6 +1919,7 @@ class WalletCategoryPieChart extends StatefulWidget {
   final bool isAllSpending;
   final SearchFilters? searchFilters;
   final DateTimeRange? selectedDateTimeRange;
+  final DateTimeRange? Function()? getDateTimeRangeForPassedSearchFilters;
 
   @override
   State<WalletCategoryPieChart> createState() => _WalletCategoryPieChartState();
@@ -2100,6 +2105,20 @@ class _WalletCategoryPieChartState extends State<WalletCategoryPieChart> {
                             widget.isAllSpending == true,
                   ),
                   ...categoryEntries,
+                  TagSpendingSummary(
+                    walletPks: widget.walletPks,
+                    isIncome: isIncome,
+                    isAllSpending: widget.isAllSpending,
+                    cycleSettingsExtension: widget.cycleSettingsExtension,
+                    totalSpent: s.totalSpent,
+                    selectedDateTimeRange: widget.selectedDateTimeRange,
+                    searchFilters: widget.searchFilters,
+                    getDateTimeRangeForPassedSearchFilters:
+                        widget.getDateTimeRangeForPassedSearchFilters,
+                    useHorizontalPaddingConstrained:
+                        enableDoubleColumn(context) == false ||
+                            widget.isAllSpending == false,
+                  ),
                   SizedBox(height: 10),
                 ],
               );
