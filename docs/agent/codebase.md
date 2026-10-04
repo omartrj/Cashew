@@ -18,7 +18,7 @@ Cashew/
 │   │   ├── widgets/             ← widget riutilizzabili (87) + framework/, transactionEntry/, util/
 │   │   └── modified/            ← reorderable_list modificata
 │   ├── packages/                ← pacchetti abbandonati, copiati e modificati (sliding_sheet, implicitly_animated_reorderable_list)
-│   ├── drift_schemas/           ← export JSON degli schemi DB (v33 → v46)
+│   ├── drift_schemas/           ← export JSON degli schemi DB (v33 → v47)
 │   ├── assets/                  ← font, icone categorie, traduzioni, valute
 │   ├── android/ ios/ web/       ← piattaforme (niente desktop)
 │   └── test/                    ← vuoto (template)
@@ -55,7 +55,7 @@ Variabili top-level, inizializzate in `main()`:
 ## Database (Drift)
 
 - Tutto in `database/tables.dart`: tabelle, enum, `@DriftDatabase` (`FinanceDatabase`) e circa 190 metodi di query. È il "repository" dell'app: aggiungi lì le nuove query.
-- Tabelle: `Wallets` (in UI "Accounts"), `Transactions`, `Categories` (con sottocategorie), `CategoryBudgetLimits`, `AssociatedTitles`, `Budgets`, `AppSettings`, `ScannerTemplates`, `Objectives` (in UI "Goals"), `DeleteLogs` (traccia le cancellazioni per la sync).
+- Tabelle: `Wallets` (in UI "Accounts"), `Transactions`, `Categories` (con sottocategorie), `CategoryBudgetLimits`, `AssociatedTitles`, `Budgets`, `AppSettings`, `ScannerTemplates`, `Objectives` (in UI "Goals"), `Tags` (tag globali del fork: le transazioni li referenziano con la lista JSON `Transactions.tagFks`), `DeleteLogs` (traccia le cancellazioni per la sync).
 - **Le chiavi primarie sono stringhe UUID** (`text().clientDefault(() => uuid.v4())`), es. `transactionPk`, `categoryFk`, `walletFk`. Il wallet di default ha pk `"0"`.
 - Convenzioni dei metodi: `watchX` / `getX` restituiscono `Stream` (la UI usa `StreamBuilder`), mentre le letture una tantum restituiscono `Future`. Le scritture passano da `createOrUpdateX(...)` (es. `createOrUpdateTransaction`, `createOrUpdateCategory`, `createOrUpdateBudget`), che gestiscono anche `dateTimeModified` e la sync: usa quelli, non insert/update diretti.
 - Molti enum di dominio sono in cima a `tables.dart`: `TransactionSpecialType` (upcoming, subscription, repetitive, credit, debt), `BudgetReoccurence`, `ObjectiveType`, `ExpenseIncome`, `PaidStatus`, `HomePageWidgetDisplay`, `MethodAdded`…
@@ -64,14 +64,14 @@ Variabili top-level, inizializzate in `main()`:
 
 ### Migrazione dello schema (obbligatoria per ogni modifica a tabelle o colonne)
 
-Versione attuale: `schemaVersionGlobal = 46` (`tables.dart`, riga ~29). Da `budget/`:
+Versione attuale: `schemaVersionGlobal = 47` (`tables.dart`, riga ~29). Da `budget/`:
 
 1. Modifica tabelle e colonne in `tables.dart`; preferisci colonne `nullable()` o con default, per non rompere i dati esistenti.
-2. Porta `schemaVersionGlobal` a 47.
-3. `fvm dart run build_runner build --delete-conflicting-outputs`
-4. `fvm dart run drift_dev schema dump lib/database/tables.dart drift_schemas/drift_schema_v47.json`
+2. Porta `schemaVersionGlobal` a 48.
+3. `fvm dart run build_runner build --delete-conflicting-outputs` (`budget/build.yaml` disattiva i "manager" di drift 2.18, così `tables.g.dart` resta simile a quello upstream)
+4. `fvm dart run drift_dev schema dump lib/database/tables.dart drift_schemas/drift_schema_v48.json`
 5. `fvm dart run drift_dev schema steps drift_schemas/ lib/database/schema_versions.dart`
-6. In `MigrationStrategy.onUpgrade` (~riga 714) aggiungi il passo `from46To47: (m, schema) async { ... }` dentro `stepByStep(migrationSteps(...))` (~riga 869), seguendo il modello di `from45To46`.
+6. In `MigrationStrategy.onUpgrade` (~riga 714) aggiungi il passo `from47To48: (m, schema) async { ... }` dentro `stepByStep(migrationSteps(...))` (~riga 869), seguendo il modello di `from46To47`.
 7. Attenzione a import ed export: `widgets/importDB.dart`, `exportDB.dart`, `importCSV.dart` ed `exportCSV.dart` possono dover gestire la nuova colonna, così come la sync (`struct/syncClient.dart`).
 
 ## Navigazione e UI

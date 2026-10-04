@@ -26,7 +26,7 @@ import 'package:budget/pages/activityPage.dart';
 import 'package:flutter/material.dart' show RangeValues;
 part 'tables.g.dart';
 
-int schemaVersionGlobal = 46;
+int schemaVersionGlobal = 47;
 
 // To update and migrate the database, check the README
 
@@ -221,6 +221,7 @@ enum DeleteLogType {
   ScannerTemplate,
   Objective,
   Unused, // Was for the scanner template, but is now unused
+  Tag,
 }
 
 enum UpdateLogType {
@@ -233,6 +234,7 @@ enum UpdateLogType {
   ScannerTemplate,
   Objective,
   Unused, // Was for the scanner template, but is now unused
+  Tag,
 }
 
 @DataClassName('DeleteLog')
@@ -333,6 +335,9 @@ class Transactions extends Table {
   TextColumn get objectiveLoanFk =>
       text().references(Objectives, #objectivePk).nullable()();
   TextColumn get budgetFksExclude =>
+      text().map(const StringListInColumnConverter()).nullable()();
+  // The tags (Tags.tagPk) assigned to this transaction, null if there are none
+  TextColumn get tagFks =>
       text().map(const StringListInColumnConverter()).nullable()();
 
   @override
@@ -538,6 +543,22 @@ class Objectives extends Table {
   Set<Column> get primaryKey => {objectivePk};
 }
 
+// Global tags, a transaction can have many (see Transactions.tagFks)
+@DataClassName('Tag')
+class Tags extends Table {
+  TextColumn get tagPk => text().clientDefault(() => uuid.v4())();
+  TextColumn get name => text().withLength(max: NAME_LIMIT)();
+  TextColumn get colour => text().withLength(max: COLOUR_LIMIT).nullable()();
+  DateTimeColumn get dateCreated =>
+      dateTime().clientDefault(() => new DateTime.now())();
+  DateTimeColumn get dateTimeModified =>
+      dateTime().withDefault(Constant(DateTime.now())).nullable()();
+  IntColumn get order => integer()();
+
+  @override
+  Set<Column> get primaryKey => {tagPk};
+}
+
 class TransactionWithCategory {
   final TransactionCategory category;
   final Transaction transaction;
@@ -688,6 +709,7 @@ class CategoryWithTotal {
   ScannerTemplates,
   DeleteLogs,
   Objectives,
+  Tags,
 ])
 class FinanceDatabase extends _$FinanceDatabase {
   // FinanceDatabase() : super(_openConnection());
@@ -1161,6 +1183,22 @@ class FinanceDatabase extends _$FinanceDatabase {
               } catch (e) {
                 print(
                     "Migration Error: Error creating column objectives.type " +
+                        e.toString());
+              }
+            },
+            from46To47: (m, schema) async {
+              try {
+                await m.createTable(schema.tags);
+              } catch (e) {
+                print("Migration Error: Error creating table tags " +
+                    e.toString());
+              }
+              try {
+                await m.addColumn(
+                    schema.transactions, schema.transactions.tagFks);
+              } catch (e) {
+                print(
+                    "Migration Error: Error creating column transactions.tagFks " +
                         e.toString());
               }
             },
@@ -2575,6 +2613,14 @@ class FinanceDatabase extends _$FinanceDatabase {
         .get();
   }
 
+  Future<List<Tag>> getAllNewTags(DateTime lastSynced) {
+    return (select(tags)
+          ..where((tbl) =>
+              tbl.dateTimeModified.isBiggerOrEqualValue(lastSynced) |
+              tbl.dateTimeModified.isNull()))
+        .get();
+  }
+
   Future<List<ScannerTemplate>> getAllNewScannerTemplates(DateTime lastSynced) {
     return (select(scannerTemplates)
           ..where((tbl) =>
@@ -2800,6 +2846,141 @@ class FinanceDatabase extends _$FinanceDatabase {
 
     return into(objectives)
         .insert((companionToInsert), mode: InsertMode.insertOrReplace);
+  }
+
+  //create or update a new tag
+  Future<int> createOrUpdateTag(Tag tag,
+      {DateTime? customDateTimeModified, bool insert = false}) {
+    tag = tag.copyWith(name: tag.name.trim());
+    tag = tag.copyWith(
+        dateTimeModified: Value(customDateTimeModified ?? DateTime.now()));
+    TagsCompanion companionToInsert = tag.toCompanion(true);
+
+    if (insert) {
+      // Use auto incremented ID when inserting
+      companionToInsert = companionToInsert.copyWith(tagPk: Value.absent());
+    }
+
+    return into(tags)
+        .insert((companionToInsert), mode: InsertMode.insertOrReplace);
+  }
+
+  Stream<List<Tag>> watchAllTags({String? searchFor}) {
+    return (select(tags)
+          ..where((t) => searchFor == null
+              ? Constant(true)
+              : t.name.collate(Collate.noCase).like("%" + searchFor + "%"))
+          ..orderBy([(t) => OrderingTerm.asc(t.order)]))
+        .watch();
+  }
+
+  Future<List<Tag>> getAllTags() {
+    return (select(tags)..orderBy([(t) => OrderingTerm.asc(t.order)])).get();
+  }
+
+  Future<Tag> getTagInstance(String tagPk) {
+    return (select(tags)..where((t) => t.tagPk.equals(tagPk))).getSingle();
+  }
+
+  Future<Tag?> getTagInstanceGivenNameTrim(String name) {
+    return (select(tags)
+          ..where(
+              (t) => t.name.lower().trim().equals(name.toLowerCase().trim()))
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<int> getAmountOfTags() async {
+    return (await select(tags).get()).length;
+  }
+
+  Future moveTag(String tagPk, int newPosition, int oldPosition) async {
+    List<Tag> tagsList = await (select(tags)
+          ..orderBy([(t) => OrderingTerm.asc(t.order)]))
+        .get();
+    await batch((batch) {
+      if (newPosition > oldPosition) {
+        for (Tag tag in tagsList) {
+          batch.update(
+            tags,
+            TagsCompanion(
+              order: Value(tag.order - 1),
+              dateTimeModified: Value(DateTime.now()),
+            ),
+            where: (t) =>
+                t.tagPk.equals(tag.tagPk) &
+                t.order.isBiggerOrEqualValue(oldPosition) &
+                t.order.isSmallerOrEqualValue(newPosition),
+          );
+        }
+      } else {
+        for (Tag tag in tagsList) {
+          batch.update(
+            tags,
+            TagsCompanion(
+              order: Value(tag.order + 1),
+              dateTimeModified: Value(DateTime.now()),
+            ),
+            where: (t) =>
+                t.tagPk.equals(tag.tagPk) &
+                t.order.isBiggerOrEqualValue(newPosition) &
+                t.order.isSmallerOrEqualValue(oldPosition),
+          );
+        }
+      }
+      batch.update(
+        tags,
+        TagsCompanion(
+          order: Value(newPosition),
+          dateTimeModified: Value(DateTime.now()),
+        ),
+        where: (t) => t.tagPk.equals(tagPk),
+      );
+    });
+  }
+
+  Future<bool> shiftTags(int direction, int pastIndexIncluding) async {
+    if (direction != -1 && direction != 1) return false;
+    List<Tag> tagsList = await (select(tags)
+          ..where((t) => t.order.isBiggerOrEqualValue(pastIndexIncluding)))
+        .get();
+    await batch((batch) {
+      for (Tag tag in tagsList) {
+        batch.update(
+          tags,
+          TagsCompanion(
+            order: Value(tag.order + direction),
+            dateTimeModified: Value(DateTime.now()),
+          ),
+          where: (t) => t.tagPk.equals(tag.tagPk),
+        );
+      }
+    });
+    return true;
+  }
+
+  Future<List<Transaction>> getAllTransactionsWithTag(String tagPk) {
+    return (select(transactions)..where((t) => t.tagFks.contains(tagPk)))
+        .get();
+  }
+
+  // Removes the tag from every transaction, then deletes it
+  Future<int> deleteTag(Tag tag) async {
+    List<Transaction> allTransactionsToUpdate = [];
+    for (Transaction transaction
+        in await getAllTransactionsWithTag(tag.tagPk)) {
+      List<String> tagFks = [...(transaction.tagFks ?? [])];
+      tagFks.remove(tag.tagPk);
+      allTransactionsToUpdate.add(transaction.copyWith(
+        tagFks: Value(tagFks.isEmpty ? null : tagFks),
+        dateTimeModified: Value(DateTime.now()),
+      ));
+    }
+    await updateBatchTransactionsOnly(allTransactionsToUpdate);
+
+    await shiftTags(-1, tag.order);
+    await createDeleteLog(DeleteLogType.Tag, tag.tagPk);
+    return (delete(tags)..where((t) => t.tagPk.equals(tag.tagPk))).go();
   }
 
   //create or update a new wallet
@@ -3697,6 +3878,15 @@ class FinanceDatabase extends _$FinanceDatabase {
                   syncLog.transactionDateTime ?? DateTime.now(),
                 ),
           );
+        } else if (syncLog.deleteLogType == DeleteLogType.Tag) {
+          batch.deleteWhere(
+            tags,
+            (tbl) =>
+                tbl.tagPk.equals(syncLog.pk) &
+                tbl.dateTimeModified.isSmallerThanValue(
+                  syncLog.transactionDateTime ?? DateTime.now(),
+                ),
+          );
         } else if (syncLog.updateLogType == UpdateLogType.TransactionWallet) {
           batch.update(
             wallets,
@@ -3793,6 +3983,18 @@ class FinanceDatabase extends _$FinanceDatabase {
                 ),
           );
           batch.insert(objectives, syncLog.itemToUpdate,
+              mode: InsertMode.insertOrReplace);
+        } else if (syncLog.updateLogType == UpdateLogType.Tag) {
+          batch.update(
+            tags,
+            syncLog.itemToUpdate,
+            where: (tbl) =>
+                tbl.tagPk.equals(syncLog.pk) &
+                tbl.dateTimeModified.isSmallerThanValue(
+                  syncLog.transactionDateTime ?? DateTime.now(),
+                ),
+          );
+          batch.insert(tags, syncLog.itemToUpdate,
               mode: InsertMode.insertOrReplace);
         }
       }

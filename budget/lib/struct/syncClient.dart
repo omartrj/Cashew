@@ -464,6 +464,19 @@ Future<bool> _syncData(BuildContext context) async {
       print("NEW OBJECTIVES");
       print(newObjectives);
 
+      List<Tag> newTags = await databaseSync.getAllNewTags(lastSynced);
+      for (Tag newEntry in newTags) {
+        syncLogs.add(SyncLog(
+          deleteLogType: null,
+          updateLogType: UpdateLogType.Tag,
+          pk: newEntry.tagPk,
+          itemToUpdate: newEntry,
+          transactionDateTime: newEntry.dateTimeModified,
+        ));
+      }
+      print("NEW TAGS");
+      print(newTags);
+
       List<DeleteLog> deleteLogs =
           await databaseSync.getAllNewDeleteLogs(lastSynced);
 

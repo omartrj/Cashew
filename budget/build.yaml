@@ -1,0 +1,7 @@
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # tables.g.dart upstream was generated without the drift 2.18 managers API
+          generate_manager: false
