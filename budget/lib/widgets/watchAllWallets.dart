@@ -25,7 +25,22 @@ class WatchAllWallets extends StatelessWidget {
   }
 }
 
-final selectedWalletPkController = StreamController<SelectedWalletPk>();
+// Provider.of<AllTags>(context).tagsOf(transaction.tagFks)
+class WatchAllTags extends StatelessWidget {
+  const WatchAllTags({required this.child, super.key});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamProvider<AllTags>.value(
+      initialData: AllTags(list: [], indexedByPk: {}),
+      value: database.watchAllTagsIndexed(),
+      child: child,
+    );
+  }
+}
+
+final selectedWalletPkController =StreamController<SelectedWalletPk>();
 
 class WatchSelectedWalletPk extends StatelessWidget {
   const WatchSelectedWalletPk({required this.child, super.key});

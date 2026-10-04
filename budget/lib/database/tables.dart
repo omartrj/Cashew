@@ -612,6 +612,18 @@ class WalletWithDetails {
   });
 }
 
+class AllTags {
+  final List<Tag> list;
+  final Map<String, Tag> indexedByPk;
+  AllTags({required this.list, required this.indexedByPk});
+
+  // The tags of a transaction, in the order of the tags list
+  List<Tag> tagsOf(List<String>? tagPks) {
+    if (tagPks == null || tagPks.isEmpty) return [];
+    return list.where((tag) => tagPks.contains(tag.tagPk)).toList();
+  }
+}
+
 class AllWallets {
   final List<TransactionWallet> list;
   final Map<String, TransactionWallet> indexedByPk;
@@ -2413,6 +2425,15 @@ class FinanceDatabase extends _$FinanceDatabase {
         category.categoryPk: category,
     };
     return indexedByPk;
+  }
+
+  Stream<AllTags> watchAllTagsIndexed() {
+    return (select(tags)..orderBy([(t) => OrderingTerm.asc(t.order)]))
+        .watch()
+        .map((tags) => AllTags(
+              list: tags,
+              indexedByPk: {for (Tag tag in tags) tag.tagPk: tag},
+            ));
   }
 
   Stream<AllWallets> watchAllWalletsIndexed() {
@@ -5997,6 +6018,8 @@ class FinanceDatabase extends _$FinanceDatabase {
         onlyShowBasedOnObjectiveFks(tbl, searchFilters.objectivePks);
     Expression<bool> isInObjectiveLoanPks =
         onlyShowBasedOnObjectiveLoanFks(tbl, searchFilters.objectiveLoanPks);
+    Expression<bool> isInTagPks =
+        onlyShowBasedOnTagFks(tbl, searchFilters.tagPks);
 
     Expression<bool> isBalanceCorrectionAnd =
         searchFilters.categoryPks.contains("0")
@@ -6145,6 +6168,7 @@ class FinanceDatabase extends _$FinanceDatabase {
         isInExcludedBudgetPks &
         isInObjectivePks &
         isInObjectiveLoanPks &
+        isInTagPks &
         isInQuery &
         (isIncome | isExpense) &
         isPositiveCashFlow &
@@ -6559,6 +6583,17 @@ class FinanceDatabase extends _$FinanceDatabase {
                 ? tbl.sharedReferenceBudgetPk
                     .isIn(budgetFks.map((value) => value ?? "0").toList())
                 : Constant(true));
+  }
+
+  // Transactions that have at least one of the tags
+  Expression<bool> onlyShowBasedOnTagFks(
+      $TransactionsTable tbl, List<String>? tagFks) {
+    if (tagFks == null || tagFks.isEmpty) return Constant(true);
+    Expression<bool> result = Constant(false);
+    for (String tagFk in tagFks) {
+      result = result | tbl.tagFks.contains(tagFk);
+    }
+    return tbl.tagFks.isNotNull() & result;
   }
 
   Expression<bool> onlyShowBasedOnExcludedBudgetFks(

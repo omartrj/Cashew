@@ -157,7 +157,9 @@ class App extends StatelessWidget {
                 child: WatchForDayChange(
                   child: WatchSelectedWalletPk(
                     child: WatchAllWallets(
-                      child: child ?? SizedBox.shrink(),
+                      child: WatchAllTags(
+                        child: child ?? SizedBox.shrink(),
+                      ),
                     ),
                   ),
                 ),

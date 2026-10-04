@@ -174,6 +174,9 @@ class TransactionEntryTag extends StatelessWidget {
               name: "excluded".tr(),
             ),
           ];
+          // The tags assigned by the user (Tags table)
+          List<Tag> transactionTags =
+              Provider.of<AllTags>(context).tagsOf(transaction.tagFks);
           // work in preogress...
           // if maxwidth > maxWidth/tagCount, wrap in flexible, otherwise dont
           return Column(
@@ -183,7 +186,16 @@ class TransactionEntryTag extends StatelessWidget {
               Row(
                 children: [
                   for (int i = 0; i < tags.length; i++)
-                    if (tagsToShow[i]) Flexible(child: tags[i])
+                    if (tagsToShow[i]) Flexible(child: tags[i]),
+                  for (Tag tag in transactionTags)
+                    Flexible(
+                      child: TransactionTag(
+                        color: HexColor(tag.colour,
+                            defaultColor:
+                                Theme.of(context).colorScheme.primary),
+                        name: tag.name,
+                      ),
+                    ),
                 ],
               ),
               if (transaction.sharedKey != null ||

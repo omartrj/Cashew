@@ -6,6 +6,7 @@ import 'package:budget/pages/addBudgetPage.dart';
 import 'package:budget/pages/addObjectivePage.dart';
 import 'package:budget/pages/addTransactionPage.dart';
 import 'package:budget/pages/addWalletPage.dart';
+import 'package:budget/pages/editTagsPage.dart';
 import 'package:budget/pages/transactionsSearchPage.dart';
 import 'package:budget/struct/settings.dart';
 import 'package:budget/widgets/animatedExpanded.dart';
@@ -32,6 +33,7 @@ class SearchFilters {
     this.excludedBudgetPks = const [],
     this.objectivePks = const [],
     this.objectiveLoanPks = const [],
+    this.tagPks = const [],
     this.expenseIncome = const [],
     this.positiveCashFlow, //Similar to isIncome, but includes anything that is positive amount (loans)
     this.paidStatus = const [],
@@ -55,6 +57,7 @@ class SearchFilters {
     objectivePks = this.objectivePks.isEmpty ? [] : this.objectivePks;
     objectiveLoanPks =
         this.objectiveLoanPks.isEmpty ? [] : this.objectiveLoanPks;
+    tagPks = this.tagPks.isEmpty ? [] : this.tagPks;
     expenseIncome = this.expenseIncome.isEmpty ? [] : this.expenseIncome;
     positiveCashFlow = this.positiveCashFlow;
     paidStatus = this.paidStatus.isEmpty ? [] : this.paidStatus;
@@ -76,6 +79,8 @@ class SearchFilters {
   List<String> excludedBudgetPks;
   List<String?> objectivePks;
   List<String?> objectiveLoanPks;
+  // Transactions with at least one of these tags
+  List<String> tagPks;
   List<ExpenseIncome> expenseIncome;
   bool? positiveCashFlow;
   List<PaidStatus> paidStatus;
@@ -97,6 +102,7 @@ class SearchFilters {
     List<String>? excludedBudgetPks,
     List<String?>? objectivePks,
     List<String?>? objectiveLoanPks,
+    List<String>? tagPks,
     List<ExpenseIncome>? expenseIncome,
     bool? positiveCashFlow,
     List<PaidStatus>? paidStatus,
@@ -118,6 +124,7 @@ class SearchFilters {
       excludedBudgetPks: excludedBudgetPks ?? this.excludedBudgetPks,
       objectivePks: objectivePks ?? this.objectivePks,
       objectiveLoanPks: objectiveLoanPks ?? this.objectiveLoanPks,
+      tagPks: tagPks ?? this.tagPks,
       expenseIncome: expenseIncome ?? this.expenseIncome,
       positiveCashFlow: positiveCashFlow,
       paidStatus: paidStatus ?? this.paidStatus,
@@ -143,6 +150,7 @@ class SearchFilters {
     excludedBudgetPks = [];
     objectivePks = [];
     objectiveLoanPks = [];
+    tagPks = [];
     expenseIncome = [];
     positiveCashFlow = null;
     paidStatus = [];
@@ -165,6 +173,7 @@ class SearchFilters {
         excludedBudgetPks.isEmpty &&
         objectivePks.isEmpty &&
         objectiveLoanPks.isEmpty &&
+        tagPks.isEmpty &&
         expenseIncome.isEmpty &&
         positiveCashFlow == null &&
         paidStatus.isEmpty &&
@@ -231,6 +240,9 @@ class SearchFilters {
             } else {
               objectiveLoanPks.add(value);
             }
+            break;
+          case 'tagPks':
+            tagPks.add(value);
             break;
           case 'expenseIncome':
             expenseIncome.add(ExpenseIncome.values[int.parse(value)]);
@@ -345,6 +357,9 @@ class SearchFilters {
     }
     for (String? element in objectiveLoanPks) {
       outString += "objectiveLoanPks:-:" + element.toString() + ":-:";
+    }
+    for (String element in tagPks) {
+      outString += "tagPks:-:" + element + ":-:";
     }
     for (ExpenseIncome element in expenseIncome) {
       outString += "expenseIncome:-:" + (element.index).toString() + ":-:";
@@ -1112,6 +1127,39 @@ class _TransactionFiltersSelectionState
             }
           },
         ),
+
+        Builder(builder: (context) {
+          List<Tag> tags = Provider.of<AllTags>(context).list;
+          if (tags.isEmpty) return SizedBox.shrink();
+          return SelectChips(
+            items: tags,
+            getLabel: (Tag item) => item.name,
+            getAvatar: (Tag item) => TagColorDot(tag: item),
+            onSelected: (Tag item) {
+              if (selectedFilters.tagPks.contains(item.tagPk)) {
+                selectedFilters.tagPks.remove(item.tagPk);
+              } else {
+                selectedFilters.tagPks.add(item.tagPk);
+              }
+              setSearchFilters();
+            },
+            getSelected: (Tag item) =>
+                selectedFilters.tagPks.contains(item.tagPk),
+            getCustomBorderColor: (Tag item) {
+              return dynamicPastel(
+                context,
+                lightenPastel(
+                  HexColor(
+                    item.colour,
+                    defaultColor: Theme.of(context).colorScheme.primary,
+                  ),
+                  amount: 0.3,
+                ),
+                amount: 0.4,
+              );
+            },
+          );
+        }),
         // SelectChips(
         //   items: MethodAdded.values,
         //   getLabel: (item) {
@@ -1497,6 +1545,18 @@ class AppliedFilterChips extends StatelessWidget {
     if (searchFilters.objectiveLoanPks.contains(null)) {
       out.add(AppliedFilterChip(
         label: "no-loan".tr(),
+        openFiltersSelection: openFiltersSelection,
+      ));
+    }
+    // Tags
+    for (Tag tag in Provider.of<AllTags>(context, listen: false)
+        .tagsOf(searchFilters.tagPks)) {
+      out.add(AppliedFilterChip(
+        label: tag.name,
+        customBorderColor: HexColor(
+          tag.colour,
+          defaultColor: Theme.of(context).colorScheme.primary,
+        ),
         openFiltersSelection: openFiltersSelection,
       ));
     }
